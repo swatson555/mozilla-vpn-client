@@ -78,6 +78,7 @@ class Logger {
   Log log();
   Log error();
   Log warning();
+  Log info();
   Log debug();
 
  private:
