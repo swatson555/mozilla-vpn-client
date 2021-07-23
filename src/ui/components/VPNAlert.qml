@@ -21,7 +21,7 @@ Item {
 
     VPNDropShadow {
         anchors.fill: parent
-        source: parent
+        source: alertBox
         opacity: .1
         state: "overwrite-state"
         z: -1

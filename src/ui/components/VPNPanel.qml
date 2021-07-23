@@ -64,6 +64,7 @@ Item {
                 }
 
                 layer.effect: OpacityMask {
+                    source: logo
                     maskSource: maskImage ? mask : undefined
                 }
 

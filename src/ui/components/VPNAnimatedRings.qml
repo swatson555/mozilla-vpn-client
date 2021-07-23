@@ -223,17 +223,18 @@ Rectangle {
 
         }
 
-        layer.effect: OpacityMask {
 
-            maskSource: Item {
-                width: animatedRingsWrapper.width
-                height: animatedRingsWrapper.height
+    }
 
-                Rectangle {
-                    anchors.fill: parent
-                    radius: animatedRingsWrapper.radius
-                }
+    OpacityMask {
+        source: bgGradient
+        maskSource: Item {
+            width: animatedRingsWrapper.width
+            height: animatedRingsWrapper.height
 
+            Rectangle {
+                anchors.fill: parent
+                radius: animatedRingsWrapper.radius
             }
 
         }

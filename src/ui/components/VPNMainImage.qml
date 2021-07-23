@@ -298,6 +298,7 @@ Rectangle {
     LinearGradient {
         id: gradient
         anchors.fill: logo
+        source: globe
         start: Qt.point(0, logo.width)
         end: Qt.point(logo.height,0)
         gradient:
