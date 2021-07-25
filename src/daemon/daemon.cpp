@@ -58,16 +58,16 @@ bool Daemon::activate(const InterfaceConfig& config) {
   //    method calls switchServer().
   //
   // At the end, if the activation succeds, the `connected` signal is emitted.
-  logger.log() << "Activating interface" << config.m_ifname;
+  logger.log() << "Activating interface";
 
   if (m_connections.contains(config.m_hopindex)) {
     if (supportServerSwitching(config)) {
       logger.log() << "Already connected. Server switching supported.";
 
-      m_connections[config.m_hopindex] = ConnectionState(config);
       if (!switchServer(config)) {
         return false;
       }
+      m_connections[config.m_hopindex] = ConnectionState(config);
 
       emit connected(config.m_hopindex);
       return true;
@@ -85,17 +85,20 @@ bool Daemon::activate(const InterfaceConfig& config) {
   prepareActivation(config);
 
   if (supportWGUtils()) {
-    if (wgutils()->interfaceExists(config.m_ifname)) {
-      logger.log() << "Wireguard interface" << config.m_ifname
-                   << "already exists.";
-      return false;
+    // Bring up the wireguard interface if not already done.
+    if (!wgutils()->interfaceExists()) {
+      if (!wgutils()->addInterface(config)) {
+        logger.log() << "Interface creation failed.";
+        return false;
+      }
     }
-    // add_if and configure
-    if (!wgutils()->addInterface(config)) {
-      qWarning("Interface creation failed. Removing `%s`.", WG_INTERFACE);
+    // Add the peer to this interface.
+    if (!wgutils()->updatePeer(config)) {
+      logger.log() << "Peer creation failed.";
       return false;
     }
   }
+
   if ((config.m_hopindex == 0) && supportDnsUtils()) {
     QList<QHostAddress> resolvers;
     resolvers.append(QHostAddress(config.m_dnsServer));
@@ -107,10 +110,11 @@ bool Daemon::activate(const InterfaceConfig& config) {
       resolvers.append(QHostAddress(config.m_serverIpv6Gateway));
     }
 
-    if (!dnsutils()->updateResolvers(config.m_ifname, resolvers)) {
+    if (!dnsutils()->updateResolvers(WG_INTERFACE, resolvers)) {
       return false;
     }
   }
+
   if (supportIPUtils()) {
     if (!iputils()->addInterfaceIPs(config)) {
       return false;
@@ -119,18 +123,19 @@ bool Daemon::activate(const InterfaceConfig& config) {
       return false;
     }
   }
+
+  // set routing
   if (supportWGUtils()) {
-    // set routing
     for (const IPAddressRange& ip : config.m_allowedIPAddressRanges) {
-      if (!wgutils()->addRoutePrefix(ip, config.m_ifname)) {
-        logger.log() << "Routing configuration failed for" << config.m_ifname;
+      if (!wgutils()->updateRoutePrefix(ip, config.m_hopindex)) {
+        logger.log() << "Routing configuration failed for" << ip.toString();
         return false;
       }
     }
   }
 
   bool status = run(Up, config);
-  logger.log() << "Connection" << config.m_ifname << "status:" << status;
+  logger.log() << "Connection status:" << status;
   if (status) {
     m_connections[config.m_hopindex] = ConnectionState(config);
     emit connected(config.m_hopindex);
@@ -212,7 +217,6 @@ bool Daemon::parseConfig(const QJsonObject& obj, InterfaceConfig& config) {
     }
     config.m_hopindex = value.toInt();
   }
-  config.m_ifname = interfaceName(config.m_hopindex);
 
   if (!obj.contains(JSON_ALLOWEDIPADDRESSRANGES)) {
     logger.log() << JSON_ALLOWEDIPADDRESSRANGES
@@ -286,34 +290,42 @@ bool Daemon::parseConfig(const QJsonObject& obj, InterfaceConfig& config) {
 }
 
 bool Daemon::deactivate(int hopindex, bool emitSignals) {
-  QString ifname = interfaceName(hopindex);
-  logger.log() << "Deactivating interface" << ifname;
+  logger.log() << "Deactivating hop" << hopindex;
 
   if (!m_connections.contains(hopindex)) {
-    logger.log() << "Wireguard interface" << ifname << "does not exist.";
+    logger.log() << "Wireguard interface hop" << hopindex << "does not exist.";
     return false;
   }
-
   const InterfaceConfig& config = m_connections.value(hopindex).m_config;
-  bool status = run(Down, config);
 
-  if ((hopindex == 0) && supportDnsUtils()) {
-    if (!dnsutils()->restoreResolvers()) {
+  // For multihop interfaces, just remove the peer and carry on.
+  if (hopindex > 0) {
+    Q_ASSERT(supportWGUtils());
+    if (!wgutils()->deletePeer(config.m_serverPublicKey)) {
       return false;
     }
+    // TODO: Any routing to clean up?
   }
-
-  if (supportWGUtils()) {
-    if (!wgutils()->interfaceExists(config.m_ifname)) {
-      logger.log() << "Wireguard interface" << config.m_ifname
-                   << "does not exist.";
-      return false;
-    }
-    if (!wgutils()->deleteInterface(config.m_ifname)) {
+  // Otherwise, we are deactivating the primary endpoint.
+  else {
+    if (supportDnsUtils() && !dnsutils()->restoreResolvers()) {
       return false;
     }
   }
   m_connections.remove(hopindex);
+
+  bool status = run(Down, config);
+
+  // Deactivate the wireguard interface if there are no more connections.
+  if (m_connections.isEmpty() && supportWGUtils()) {
+    if (!wgutils()->interfaceExists()) {
+      logger.log() << "Wireguard interface does not exist.";
+      return false;
+    }
+    if (!wgutils()->deleteInterface()) {
+      return false;
+    }
+  }
 
   // No notification for server switching.
   if (emitSignals && status) {
@@ -350,22 +362,34 @@ bool Daemon::switchServer(const InterfaceConfig& config) {
     return false;
   }
 
-  logger.log() << "Switching server for interface" << config.m_ifname;
+  logger.log() << "Switching server for hop" << config.m_hopindex;
 
   Q_ASSERT(m_connections.contains(config.m_hopindex));
-  wgutils()->flushRoutes(config.m_ifname);
+  const InterfaceConfig& lastConfig =
+      m_connections.value(config.m_hopindex).m_config;
 
-  if (!wgutils()->updateInterface(config)) {
+  // Activate the new peer.
+  if (!wgutils()->updatePeer(config)) {
     logger.log() << "Server switch failed to update the wireguard interface";
     return false;
   }
-
   for (const IPAddressRange& ip : config.m_allowedIPAddressRanges) {
-    if (!wgutils()->addRoutePrefix(ip, config.m_ifname)) {
+    if (!wgutils()->updateRoutePrefix(ip, config.m_hopindex)) {
       logger.log() << "Server switch failed to update the routing table";
-      return false;
+      break;
     }
   }
 
+  // Deactivate the old peer and remove any stale routes.
+  if (!wgutils()->deletePeer(lastConfig.m_serverPublicKey)) {
+    return false;
+  }
+  for (const IPAddressRange& ip : lastConfig.m_allowedIPAddressRanges) {
+    if (!config.m_allowedIPAddressRanges.contains(ip)) {
+      wgutils()->deleteRoutePrefix(ip, config.m_hopindex);
+    }
+  }
+
+  m_connections[config.m_hopindex] = ConnectionState(config);
   return true;
 }
