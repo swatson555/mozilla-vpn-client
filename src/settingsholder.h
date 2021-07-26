@@ -34,14 +34,12 @@ class SettingsHolder final : public QObject {
   Q_PROPERTY(bool connectionChangeNotification READ connectionChangeNotification
                  WRITE setConnectionChangeNotification NOTIFY
                      connectionChangeNotificationChanged)
-  Q_PROPERTY(bool useGatewayDNS READ useGatewayDNS WRITE setUseGatewayDNS NOTIFY
-                 useGatewayDNSChanged)
   Q_PROPERTY(
-      QString userDNS READ userDNS WRITE setUserDNS NOTIFY userDNSChanged)
+      QString userDNS READ customDNS WRITE setcustomDNS NOTIFY customDNSChanged)
   Q_PROPERTY(QString placeholderUserDNS READ placeholderUserDNS CONSTANT)
 
-  Q_PROPERTY(
-        int dnsProvider READ dnsProvider WRITE setDNSProvider NOTIFY dnsProviderChanged)
+  Q_PROPERTY(int dnsProvider READ dnsProvider WRITE setDNSProvider NOTIFY
+                 dnsProviderChanged)
 
  public:
   SettingsHolder();
@@ -50,10 +48,11 @@ class SettingsHolder final : public QObject {
   static SettingsHolder* instance();
 
   enum DnsProvider {
-    Custom=3,
-    BlockTracking=2,
-    BlockAds=1,
-    BlockAll=0,
+    Custom = 3,
+    BlockTracking = 2,
+    BlockAds = 1,
+    BlockAll = 0,
+    Gateway = -1,
   };
   Q_ENUM(DnsProvider)
 
@@ -107,7 +106,6 @@ class SettingsHolder final : public QObject {
   GETSET(bool, hasProtectSelectedApps, protectSelectedApps,
          setProtectSelectedApps)
   GETSET(QStringList, hasVpnDisabledApps, vpnDisabledApps, setVpnDisabledApps)
-  GETSET(bool, hasUsegatewayDNS, useGatewayDNS, setUseGatewayDNS)
   GETSET(QString, hascustomDNS, customDNS, setcustomDNS)
   GETSET(int, hasDNSProvider, dnsProvider, setDNSProvider)
   GETSET(bool, hasGleanEnabled, gleanEnabled, setGleanEnabled)
@@ -171,7 +169,6 @@ class SettingsHolder final : public QObject {
   void startAtBootChanged(bool value);
   void protectSelectedAppsChanged(bool value);
   void vpnDisabledAppsChanged(const QStringList& apps);
-  void useGatewayDNSChanged(bool value);
   void customDNSChanged(QString value);
   void dnsProviderChanged(int value);
   void gleanEnabledChanged(bool value);

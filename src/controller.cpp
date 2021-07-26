@@ -191,7 +191,8 @@ void Controller::activateInternal() {
 
   // Use the Gateway as DNS Server
   // If the user as entered a valid dns, use that instead
-  QHostAddress dns = QHostAddress(SettingsHolder::instance()->getDNS(server.ipv4Gateway()));
+  QHostAddress dns =
+      QHostAddress(SettingsHolder::instance()->getDNS(server.ipv4Gateway()));
   logger.log() << "DNS Set" << dns.toString();
 
   Q_ASSERT(m_impl);
@@ -640,23 +641,16 @@ QList<IPAddressRange> Controller::getAllowedIPAddressRanges(
       logger.log() << "Filtering out the local area networks (rfc 4193)";
       excludeIPv6s.append(RFC4193::ipv6());
     }
-
-    /*
   } else if (FeatureList::instance()->userDNSSupported() &&
-             !SettingsHolder::instance()->useGatewayDNS() &&
-             SettingsHolder::instance()->userDNS().size() > 0 &&
+             SettingsHolder::instance()->dnsProvider() ==
+                 SettingsHolder::DnsProvider::Custom &&
              SettingsHolder::instance()->validateUserDNS(
-                 SettingsHolder::instance()->userDNS()) ==
+                 SettingsHolder::instance()->customDNS()) ==
                  SettingsHolder::UserDNSOK &&
-             // No need to filter out loopback ip addresses
              !RFC5735::ipv4LoopbackAddressBlock().contains(
-                 QHostAddress(SettingsHolder::instance()->userDNS()))) {
-    // Filter out the Custom DNS Server, if the User has one.
-  }*/ 
-  else if (FeatureList::instance()->userDNSSupported() &&
-      !SettingsHolder::instance()->useGatewayDNS() &&
-       SettingsHolder::instance()->dnsProvider() == SettingsHolder::DnsProvider::Custom) {
-    // If the user has a Custom DNS but LAN disabled, we need to filter it out :)
+                 QHostAddress(SettingsHolder::instance()->customDNS()))) {
+    // If the user has a Custom DNS but LAN disabled, we need to filter it out
+    // :)
     logger.log() << "Filtering out the DNS address"
                  << SettingsHolder::instance()->customDNS();
     excludeIPv4s.append(

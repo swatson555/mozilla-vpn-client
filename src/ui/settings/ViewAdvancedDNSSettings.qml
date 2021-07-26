@@ -66,12 +66,12 @@ Item {
                     Layout.preferredWidth: Theme.vSpacing
                     Layout.preferredHeight: Theme.rowHeight
                     Layout.alignment: Qt.AlignTop
-                    checked: VPNSettings.useGatewayDNS
+                    checked: VPNSettings.dnsProvider === VPNSettings.Gateway
                     accessibleName: useDefaultLabel.text
 
                     onClicked: {
                         if (vpnFlickable.vpnIsOff) {
-                            VPNSettings.useGatewayDNS = true
+                            VPNSettings.dnsProvider = VPNSettings.Gateway
                         }
                     }
                 }
@@ -95,6 +95,81 @@ Item {
                 }
             }
 
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: Theme.windowMargin
+                Layout.rightMargin: Theme.windowMargin
+
+                VPNRadioButton {
+                    Layout.preferredWidth: Theme.vSpacing
+                    Layout.preferredHeight: Theme.rowHeight
+                    Layout.alignment: Qt.AlignTop
+                    checked: VPNSettings.dnsProvider === VPNSettings.BlockAll
+                    accessibleName: useDefaultLabel.text
+
+                    onClicked: {
+                        if (vpnFlickable.vpnIsOff) {
+                            VPNSettings.dnsProvider = VPNSettings.BlockAll
+                        }
+                    }
+                }
+
+                Column {
+                    spacing: 4
+                    Layout.fillWidth: true
+                    VPNInterLabel {
+                        id: useBlockAllLabel
+                        //% "Use AD and Tracker Blocking DNS"
+                        text: qsTrId("vpn.advancedDNSSettings.adsTrackers")
+                        Layout.alignment: Qt.AlignTop
+                    }
+
+                    VPNTextBlock {
+
+                       //% Use a Mozilla DNS that protects you from trackers and ads"
+                       text: qsTrId("vpn.advancedDNSSettings.adsTrackers.description")
+                       width: parent.width
+                    }
+                }
+            }
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: Theme.windowMargin
+                Layout.rightMargin: Theme.windowMargin
+
+                VPNRadioButton {
+                    Layout.preferredWidth: Theme.vSpacing
+                    Layout.preferredHeight: Theme.rowHeight
+                    Layout.alignment: Qt.AlignTop
+                    checked: VPNSettings.dnsProvider === VPNSettings.BlockTracking
+                    accessibleName: useDefaultLabel.text
+
+                    onClicked: {
+                        if (vpnFlickable.vpnIsOff) {
+                            VPNSettings.dnsProvider = VPNSettings.BlockTracking
+                        }
+                    }
+                }
+
+                Column {
+                    spacing: 4
+                    Layout.fillWidth: true
+                    VPNInterLabel {
+                        id: useBlockTrackingLabel
+                        //% "Use Tracking Blocking DNS"
+                        text: qsTrId("vpn.advancedDNSSettings.trackers")
+                        Layout.alignment: Qt.AlignTop
+                    }
+
+                    VPNTextBlock {
+
+                       //% "Use a Mozilla DNS that protects you from tracking"
+                       text: qsTrId("vpn.advancedDNSSettings.trackers.description")
+                       width: parent.width
+                    }
+                }
+            }
+
             ColumnLayout {
                 spacing: Theme.windowMargin
 
@@ -107,8 +182,8 @@ Item {
                         Layout.preferredWidth: Theme.vSpacing
                         Layout.preferredHeight: Theme.rowHeight
                         Layout.alignment: Qt.AlignTop
-                        checked: !VPNSettings.useGatewayDNS
-                        onClicked: VPNSettings.useGatewayDNS = false
+                        checked: VPNSettings.dnsProvider === VPNSettings.Custom
+                        onClicked: VPNSettings.dnsProvider = VPNSettings.Custom
                         accessibleName:  useLocalDNSLabel.text
                     }
 

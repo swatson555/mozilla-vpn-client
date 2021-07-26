@@ -24,11 +24,10 @@ constexpr bool SETTINGS_STARTATBOOT_DEFAULT = false;
 constexpr bool SETTINGS_PROTECTSELECTEDAPPS_DEFAULT = false;
 constexpr bool SETTINGS_SERVERSWITCHNOTIFICATION_DEFAULT = true;
 constexpr bool SETTINGS_CONNECTIONSWITCHNOTIFICATION_DEFAULT = true;
-constexpr bool SETTINGS_USEGATEWAYDNS_DEFAULT = true;
 const QStringList SETTINGS_VPNDISABLEDAPPS_DEFAULT = QStringList();
-constexpr const char* SETTINGS_USER_DNS_DEFAULT = "";
+constexpr const char* SETTINGS_CUSTOM_DNS_DEFAULT = "";
 
-const int SETTINGS_DNS_PROVIDER_DEFAULT = SettingsHolder::DnsProvider::BlockAll;
+const int SETTINGS_DNS_PROVIDER_DEFAULT = SettingsHolder::DnsProvider::Gateway;
 
 constexpr const char* SETTINGS_IPV6ENABLED = "ipv6Enabled";
 constexpr const char* SETTINGS_LOCALNETWORKACCESS = "localNetworkAccess";
@@ -48,7 +47,6 @@ constexpr const char* SETTINGS_TOKEN = "token";
 constexpr const char* SETTINGS_SERVERS = "servers";
 constexpr const char* SETTINGS_PRIVATEKEY = "privateKey";
 constexpr const char* SETTINGS_PUBLICKEY = "publicKey";
-constexpr const char* SETTINGS_USEGATEWAYDNS = "useGatewayDNS";
 constexpr const char* SETTINGS_CUSTOM_DNS = "customDNS";
 constexpr const char* SETTINGS_DNS_PROVIDER = "dnsProvider";
 constexpr const char* SETTINGS_USER_AVATAR = "user/avatar";
@@ -210,11 +208,9 @@ GETSETDEFAULT(FeatureList::instance()->localNetworkAccessSupported() &&
               bool, toBool, SETTINGS_LOCALNETWORKACCESS, hasLocalNetworkAccess,
               localNetworkAccess, setLocalNetworkAccess,
               localNetworkAccessChanged)
-GETSETDEFAULT(SETTINGS_USEGATEWAYDNS_DEFAULT, bool, toBool,
-              SETTINGS_USEGATEWAYDNS, hasUsegatewayDNS, useGatewayDNS,
-              setUseGatewayDNS, useGatewayDNSChanged)
-GETSETDEFAULT(SETTINGS_CUSTOM_DNS_DEFAULT, QString, toString, SETTINGS_CUSTOM_DNS,
-              hascustomDNS, customDNS, setcustomDNS, customDNSChanged)
+GETSETDEFAULT(SETTINGS_CUSTOM_DNS_DEFAULT, QString, toString,
+              SETTINGS_CUSTOM_DNS, hascustomDNS, customDNS, setcustomDNS,
+              customDNSChanged)
 GETSETDEFAULT(
     FeatureList::instance()->unsecuredNetworkNotificationSupported() &&
         SETTINGS_UNSECUREDNETWORKALERT_DEFAULT,
@@ -251,9 +247,8 @@ GETSETDEFAULT(SETTINGS_CONNECTIONSWITCHNOTIFICATION_DEFAULT, bool, toBool,
               setConnectionChangeNotification,
               connectionChangeNotificationChanged);
 
-GETSETDEFAULT(SETTINGS_DNS_PROVIDER_DEFAULT, int, toInt,
-              SETTINGS_DNS_PROVIDER, hasDNSProvider, dnsProvider,
-              setDNSProvider, dnsProviderChanged)
+GETSETDEFAULT(SETTINGS_DNS_PROVIDER_DEFAULT, int, toInt, SETTINGS_DNS_PROVIDER,
+              hasDNSProvider, dnsProvider, setDNSProvider, dnsProviderChanged)
 
 #undef GETSETDEFAULT
 
@@ -419,48 +414,11 @@ void SettingsHolder::addConsumedSurvey(const QString& surveyId) {
 
 SettingsHolder::UserDNSValidationResult SettingsHolder::validateUserDNS(
     const QString& dns) const {
-  logger.log() << "checking -> " << dns;
   QHostAddress address = QHostAddress(dns);
-
-  logger.log() << "is null " << address.isNull();
-
   if (address.isNull()) {
     return UserDNSInvalid;
   }
-
-  /* Currently we need to limit this to loopback and LAN IP addresses since the
-   * killswitch makes sure that no dns traffic may happen to outside of lan
-   */
-
-  if (address.protocol() == QAbstractSocket::IPv4Protocol) {
-    if (RFC5735::ipv4LoopbackAddressBlock().contains(address)) {
-      return UserDNSOK;
-    }
-
-    for (const IPAddress& network : RFC1918::ipv4()) {
-      if (network.contains(address)) {
-        return UserDNSOK;
-      }
-    }
-
-    return UserDNSOutOfRange;
-  }
-
-  if (address.protocol() == QAbstractSocket::IPv6Protocol) {
-    if (RFC4291::ipv6LoopbackAddressBlock().contains(address)) {
-      return UserDNSOK;
-    }
-
-    for (const IPAddress& network : RFC4193::ipv6()) {
-      if (network.contains(address)) {
-        return UserDNSOK;
-      }
-    }
-
-    return UserDNSOutOfRange;
-  }
-
-  return UserDNSInvalid;
+  return UserDNSOK;
 }
 
 QString SettingsHolder::placeholderUserDNS() const {
@@ -468,36 +426,38 @@ QString SettingsHolder::placeholderUserDNS() const {
 }
 
 // Returns the DNS Server the user asked for in the Settings;
-const QString MULLVAD_BLOCK_ADS_DNS = "100.64.0.1";
-const QString MULLVAD_BLOCK_TRACKING_DNS = "100.64.0.2";
-const QString MULLVAD_BLOCK_ALL_DNS = "100.64.0.3";
+constexpr const char* MULLVAD_BLOCK_ADS_DNS = "100.64.0.1";
+constexpr const char* MULLVAD_BLOCK_TRACKING_DNS = "100.64.0.2";
+constexpr const char* MULLVAD_BLOCK_ALL_DNS = "100.64.0.3";
 
-QString SettingsHolder::getDNS(const QString& serverGateWay){
-    if(!FeatureList::instance()->userDNSSupported()){
-        return serverGateWay;
-    }
-    if(useGatewayDNS()){
-        return serverGateWay;
-    }
-    switch (dnsProvider()) {
-        case BlockAll:
-             return MULLVAD_BLOCK_ALL_DNS;
-        case BlockAds:
-            return MULLVAD_BLOCK_ADS_DNS;
-        case BlockTracking:
-            return MULLVAD_BLOCK_TRACKING_DNS;
-    }
-    Q_ASSERT(dnsProvider() == Custom);
-    // User wants to use a Custom DNS, let's check that this is valid.
-    auto userDNS = customDNS();
-    if(userDNS == SETTINGS_CUSTOM_DNS_DEFAULT){
-        // User selected Custom but did not enter a dns,
-        // lets fallback
-        return serverGateWay;
-    }
-    if(!isValidCustomDNS(userDNS)){
-        logger.log() << "Saved Custom DNS seems invalid, defaulting to gateway dns";
-        return serverGateWay;
-    }
-    return userDNS;
+QString SettingsHolder::getDNS(const QString& serverGateWay) {
+  if (!FeatureList::instance()->userDNSSupported()) {
+    return serverGateWay;
+  }
+  switch (dnsProvider()) {
+    case Gateway:
+      return serverGateWay;
+    case BlockAll:
+      return MULLVAD_BLOCK_ALL_DNS;
+    case BlockAds:
+      return MULLVAD_BLOCK_ADS_DNS;
+    case BlockTracking:
+      return MULLVAD_BLOCK_TRACKING_DNS;
+    case Custom:
+    default:
+      break;
+  }
+  Q_ASSERT(dnsProvider() == Custom);
+  // User wants to use a Custom DNS, let's check that this is valid.
+  auto userDNS = customDNS();
+  if (userDNS == SETTINGS_CUSTOM_DNS_DEFAULT) {
+    // User selected Custom but did not enter a dns,
+    // lets fallback
+    return serverGateWay;
+  }
+  if (validateUserDNS(userDNS) != UserDNSOK) {
+    logger.log() << "Saved Custom DNS seems invalid, defaulting to gateway dns";
+    return serverGateWay;
+  }
+  return userDNS;
 }
