@@ -3,9 +3,12 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 import QtQuick 2.5
+import QtQuick.Layouts 1.14
 import Mozilla.VPN 1.0
 import "../components"
 import "../components/forms"
+
+import "../themes/themes.js" as Theme
 
 Item {
     // TODO
@@ -19,29 +22,75 @@ Item {
     // - errors.
     // TODO: resend the verify-email-code. (please keep this TODO!)
 
+
     Component.onCompleted: console.log("EMAIL VERIFICATION")
 
-    Text {
-        id: msg
-        text: "Email verification needed. Code:"
-        anchors.top: parent.top
+    ColumnLayout {
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.leftMargin: Theme.vSpacing
+        anchors.rightMargin: Theme.vSpacing
+        anchors.verticalCenter: parent.verticalCenter
+        spacing: Theme.windowMargin
+
+        VPNHeadline {
+            text: "Email verification code"
+
+        }
+
+        VPNTextBlock {
+            text: "Enter 6-digit code"
+            horizontalAlignment: Text.AlignHCenter
+            Layout.bottomMargin: Theme.vSpacing
+            Layout.alignment: Qt.AlignHCenter
+
+        }
+
+        RowLayout {
+            id: inputRow
+            Layout.alignment: Qt.AlignHCenter
+            Layout.bottomMargin: Theme.windowMargin
+            spacing: 4
+            Repeater {
+
+                model: 6
+                delegate: VPNTextField {
+                    id: index
+
+                    Layout.preferredHeight: Theme.rowHeight
+                    Layout.preferredWidth: Theme.rowHeight
+                    leftPadding: 16
+                    validator:  RegExpValidator {
+                        regExp: /[0-9]{1}/
+                    }
+                    onTextChanged: {
+                        if (length === 1) {
+                            btn.code[modelData] = text
+                            nextItemInFocusChain().forceActiveFocus();
+                        }
+                    }
+
+                    background: VPNInputBackground {
+                        border.color: itemToFocus.activeFocus && showInteractionStates ? showError ? Theme.red : Theme.input.focusBorder : Theme.white                    }
+                }
+            }
+        }
+
+        VPNButton {
+            id: btn
+            property var code: ["0", "0", "0", "0", "0", "0"]
+
+            text: "Verify" // TODO
+            onClicked : VPNAuthInApp.verifyEmailCode(code);
+
+
+            Layout.fillWidth: true
+        }
+
+//        VPNLinkButton {
+//            labelText: "Need another code? Resend"
+//            Layout.alignment: Qt.AlignHCenter
+//        }
     }
 
-    VPNTextField {
-        id: codeInput
-
-        anchors.top: msg.bottom
-        anchors.bottomMargin: 24
-        width: parent.width
-    }
-
-    VPNButton {
-        anchors.top: codeInput.bottom
-        anchors.bottomMargin: 24
-        text: "Verify" // TODO
-        anchors.horizontalCenterOffset: 0
-        anchors.horizontalCenter: parent.horizontalCenter
-        radius: 5
-        onClicked: VPNAuthInApp.verifyEmailCode(codeInput.text);
-    }
 }
