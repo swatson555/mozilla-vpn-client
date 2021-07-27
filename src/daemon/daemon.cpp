@@ -342,14 +342,6 @@ bool Daemon::switchServer(const InterfaceConfig& config) {
   const InterfaceConfig& lastConfig =
       m_connections.value(config.m_hopindex).m_config;
 
-  // Deactivate the old peer and remove its routes.
-  if (!wgutils()->deletePeer(lastConfig.m_serverPublicKey)) {
-    return false;
-  }
-  for (const IPAddressRange& ip : lastConfig.m_allowedIPAddressRanges) {
-    wgutils()->deleteRoutePrefix(ip, config.m_hopindex);
-  }
-
   // Activate the new peer and its routes.
   if (!wgutils()->updatePeer(config)) {
     logger.log() << "Server switch failed to update the wireguard interface";
@@ -360,6 +352,16 @@ bool Daemon::switchServer(const InterfaceConfig& config) {
       logger.log() << "Server switch failed to update the routing table";
       break;
     }
+  }
+
+  // Deactivate the old peer and remove its routes.
+  for (const IPAddressRange& ip : lastConfig.m_allowedIPAddressRanges) {
+    if (!config.m_allowedIPAddressRanges.contains(ip)) {
+      wgutils()->deleteRoutePrefix(ip, config.m_hopindex);
+    }
+  }
+  if (!wgutils()->deletePeer(lastConfig.m_serverPublicKey)) {
+    return false;
   }
 
   m_connections[config.m_hopindex] = ConnectionState(config);
