@@ -211,8 +211,8 @@ void Controller::activateInternal() {
 
   Q_ASSERT(m_impl);
   m_impl->activate(serverList, device, vpn->keys(),
-                   getAllowedIPAddressRanges(serverList),
-                   vpnDisabledApps, dns, stateToReason(m_state));
+                   getAllowedIPAddressRanges(serverList), vpnDisabledApps, dns,
+                   stateToReason(m_state));
 }
 
 bool Controller::silentSwitchServers() {
@@ -284,8 +284,8 @@ bool Controller::silentSwitchServers() {
 
   Q_ASSERT(m_impl);
   m_impl->activate(serverList, device, vpn->keys(),
-                   getAllowedIPAddressRanges(serverList),
-                   vpnDisabledApps, dns, stateToReason(StateSwitching));
+                   getAllowedIPAddressRanges(serverList), vpnDisabledApps, dns,
+                   stateToReason(StateSwitching));
   return true;
 }
 

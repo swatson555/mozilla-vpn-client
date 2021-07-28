@@ -182,8 +182,7 @@ bool Daemon::parseConfig(const QJsonObject& obj, InterfaceConfig& config) {
 
   if (!obj.contains("dnsServer")) {
     config.m_dnsServer = QString();
-  }
-  else {
+  } else {
     QJsonValue value = obj.value("dnsServer");
     if (!value.isString()) {
       logger.log() << "dnsServer is not a string";
