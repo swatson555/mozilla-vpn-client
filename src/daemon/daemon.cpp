@@ -255,7 +255,7 @@ bool Daemon::parseConfig(const QJsonObject& obj, InterfaceConfig& config) {
     }
   }
 
-  {  // Read Split Tunnel Apps
+  if (obj.contains("vpnDisabledApps")) {
     QJsonValue value = obj.value("vpnDisabledApps");
     if (!value.isArray()) {
       logger.log() << "vpnDisabledApps is not an array";
